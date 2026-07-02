@@ -1,20 +1,32 @@
 {
   "name": "puar",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.0.0",
+  "type": "module",
+  "imports": {
+    "#*": "./agent/*",
+    "#evals/*": "./evals/*"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "eve build",
+    "dev": "eve dev",
+    "start": "eve start",
+    "typecheck": "tsc"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sfrieson/puar.git"
+  "dependencies": {
+    "@vercel/connect": "0.2.2",
+    "ai": "^7.0.0",
+    "eve": "^0.17.2",
+    "zod": "4.4.3"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/sfrieson/puar/issues"
+  "devDependencies": {
+    "@types/node": "24.x",
+    "typescript": "7.0.1-rc"
   },
-  "homepage": "https://github.com/sfrieson/puar#readme"
+  "overrides": {
+    "ai": "^7.0.0"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+
 }
