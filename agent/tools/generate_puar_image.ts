@@ -127,16 +127,18 @@ export default defineTool({
       runId: current.run_id,
     };
   },
-  // The channel posts the image itself (see agent/channels/slack.ts), which gets
-  // the full object. The model just needs to know it succeeded so it can add a
-  // caption — it should NOT paste the URL, which would render as an ugly link.
+  // On Slack the channel posts the image itself as a native block (see
+  // agent/channels/slack.ts) using the full object. Other surfaces (eve web,
+  // etc.) don't, so the model should also share the raw URL as a fallback so
+  // the image is always reachable. Ask for it on its own line so channels that
+  // unfurl/render bare URLs can.
   toModelOutput(output) {
     return {
       type: "text",
       value:
-        `The image of Puar (scene: ${output.scene}) has been posted to the ` +
-        `channel for the user to see. Add a short, fun caption in your reply — ` +
-        `do not paste the image URL.`,
+        `Generated an image of Puar (scene: ${output.scene}). Add a short, fun ` +
+        `caption in your reply, then include the image URL on its own line so ` +
+        `it renders everywhere:\n${output.imageUrl}`,
     };
   },
 });

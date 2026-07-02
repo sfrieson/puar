@@ -5,8 +5,8 @@ import { Card, Image, slackChannel } from "eve/channels/slack";
 // conservatively — so a generated image URL dropped into the reply text renders
 // as a link chip, not a picture. Instead, when generate_puar_image finishes, we
 // post the result as a native Block Kit image so it always shows inline. The
-// tool's toModelOutput tells the model the image is already delivered, so it
-// just writes a caption and never pastes the URL.
+// model still shares the raw URL in its reply as a fallback for channels that
+// don't render image blocks (eve web, etc.).
 export default slackChannel({
   credentials: connectSlackCredentials("slack/puar"),
   events: {
