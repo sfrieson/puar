@@ -9,8 +9,8 @@ const TICKETS_REPO = process.env.PUAR_TICKETS_REPO ?? "sfrieson/puar";
 export default defineTool({
   description:
     "File a ticket as a GitHub issue on Puar's own repo. Use this when Steven " +
-    "asks for a new capability Puar doesn't have, or reports a bug. Confirm the " +
-    "title and a one-line description with him before calling.",
+    "or Amy asks for a new capability Puar doesn't have, or reports a bug. " +
+    "Confirm the title and a one-line description with them before calling.",
   inputSchema: z.object({
     title: z.string().min(3).describe("Short, specific issue title."),
     body: z
