@@ -127,11 +127,16 @@ export default defineTool({
       runId: current.run_id,
     };
   },
-  // The model only needs the URL to share it; channels still get the full object.
+  // The channel posts the image itself (see agent/channels/slack.ts), which gets
+  // the full object. The model just needs to know it succeeded so it can add a
+  // caption — it should NOT paste the URL, which would render as an ugly link.
   toModelOutput(output) {
     return {
       type: "text",
-      value: `Generated an image of Puar: ${output.imageUrl} (scene: ${output.scene})`,
+      value:
+        `The image of Puar (scene: ${output.scene}) has been posted to the ` +
+        `channel for the user to see. Add a short, fun caption in your reply — ` +
+        `do not paste the image URL.`,
     };
   },
 });
