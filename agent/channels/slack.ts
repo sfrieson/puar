@@ -41,11 +41,28 @@ function recordInbound(message: SlackMessage): void {
   void record(entry);
 }
 
-// Shared body for the mention/DM hooks. We override the defaults only to capture
-// into the rolling window, so we restore the "Thinking..." indicator the default
-// posts (replacing onAppMention/onDirectMessage replaces both auth AND typing),
-// then defer to the default auth derivation. Typing is best-effort: a hiccup
-// there must never drop the inbound message.
+// Slack `ts` is epoch seconds with a microsecond fraction (e.g.
+// "1735689600.000200"); eve never converts this for the model, so without this
+// the LLM only ever sees the raw string. Rendered in New York time since
+// that's the team's home timezone.
+const NY_TIMESTAMP_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  dateStyle: "medium",
+  timeStyle: "long",
+});
+
+function formatSlackTimestamp(ts: string): string {
+  return NY_TIMESTAMP_FORMAT.format(new Date(Number(ts) * 1000));
+}
+
+// Shared body for the mention/DM hooks. We override the defaults to capture into
+// the rolling window and to inject sender name + human-readable time (eve only
+// gives the model a raw Slack user id and raw `ts`, deliberately skipping profile
+// lookups; `message.author.fullName`/`userName` are already resolved by eve, so
+// this needs no extra API call). We restore the "Thinking..." indicator the
+// default posts (replacing onAppMention/onDirectMessage replaces both auth AND
+// typing), then defer to the default auth derivation. Typing is best-effort: a
+// hiccup there must never drop the inbound message.
 async function dispatchInbound(ctx: SlackContext, message: SlackMessage) {
   try {
     await ctx.thread.startTyping("Thinking...");
@@ -53,7 +70,12 @@ async function dispatchInbound(ctx: SlackContext, message: SlackMessage) {
     // best-effort indicator
   }
   recordInbound(message);
-  return { auth: defaultSlackAuth(message, ctx) };
+
+  const sender = authorLabel(message.author);
+  const senderId = message.author?.userId ? ` (Slack ID ${message.author.userId})` : "";
+  const context = [`The sender of this message is ${sender}${senderId}. It was sent at ${formatSlackTimestamp(message.ts)} (New York time).`];
+
+  return { auth: defaultSlackAuth(message, ctx), context };
 }
 
 // Slack only auto-unfurls bare, standalone URLs, and treats bot-posted links
