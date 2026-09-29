@@ -10,7 +10,7 @@ import { REMINDER_LABEL } from "../lib/reminders.js";
 export default defineTool({
   description:
     "Close an open reminder when the user says it's handled or done, which " +
-    "stops the daily nagging. Confirm the right one with the user first — use " +
+    "stops the nagging. Confirm the right one with the user first — use " +
     "list_reminders if unsure of the issue number.",
   inputSchema: z.object({
     number: z

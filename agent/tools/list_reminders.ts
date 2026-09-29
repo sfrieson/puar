@@ -22,6 +22,8 @@ export default defineTool({
         title: r.title,
         url: r.url,
         dueDate: r.dueDate ?? null,
+        frequency: r.frequency,
+        dayOfWeek: r.dayOfWeek ?? null,
       })),
     };
   },

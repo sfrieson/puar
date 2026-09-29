@@ -1,8 +1,9 @@
 // Reminders are GitHub issues labeled `reminder` on Puar's repo. Puar creates
 // them when Steven or Amy asks to be reminded of something, a daily schedule
 // (agent/schedules/reminders.ts) re-pings the origin Slack channel for every
-// open reminder, and closing the issue stops the nagging. This mirrors the
-// tickets-as-storage pattern in tickets-repo.ts and reuses its helpers.
+// open reminder that's due today, and closing the issue stops the nagging.
+// This mirrors the tickets-as-storage pattern in tickets-repo.ts and reuses
+// its helpers.
 import {
   TICKETS_REPO,
   requireGithubToken,
@@ -11,11 +12,44 @@ import {
 
 export const REMINDER_LABEL = "reminder";
 
+// How often a reminder nags. Daily is the default and the only cadence that
+// existed before weekly was added, so reminders with no stored frequency are
+// read as daily.
+export type ReminderFrequency = "daily" | "weekly";
+
+// Indexed to match Date#getDay / Intl's "long" weekday, lowercased.
+export const WEEKDAYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+// Today's weekday in New York, the team's home timezone. The nag cron fires at
+// 15:00 UTC, which is the same calendar day in New York year-round, so a
+// UTC-scheduled job can safely ask "what day is it there?". Mirrors the
+// Intl usage in agent/instructions/current-time.ts.
+const NY_WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  weekday: "long",
+});
+
+export function nycWeekday(date: Date = new Date()): Weekday {
+  return NY_WEEKDAY_FORMAT.format(date).toLowerCase() as Weekday;
+}
+
 // Metadata Puar needs to nag but shouldn't clutter the human-readable body:
-// where to deliver the nag (channelId) and an optional due date to escalate on.
+// where to deliver the nag (channelId), an optional due date to escalate on,
+// and the nag cadence (dayOfWeek is only meaningful when weekly).
 export interface ReminderMeta {
   channelId?: string;
   dueDate?: string;
+  frequency?: ReminderFrequency;
+  dayOfWeek?: Weekday;
 }
 
 // Stored as a single HTML comment at the end of the issue body so it survives
@@ -24,13 +58,22 @@ const META_PREFIX = "puar-reminder:";
 const META_RE = /<!--\s*puar-reminder:\s*(\{[\s\S]*?\})\s*-->/u;
 
 // Builds the issue body: the reminder text, a human-readable Due line when a
-// due date is set, then the machine-readable metadata comment.
+// due date is set, a Repeats line for weekly reminders, then the
+// machine-readable metadata comment.
 export function formatReminderBody(text: string, meta: ReminderMeta): string {
   const parts = [text.trim()];
   if (meta.dueDate) parts.push(`\nDue: ${meta.dueDate}`);
+  if (meta.frequency === "weekly") {
+    const day = meta.dayOfWeek;
+    parts.push(
+      `\nRepeats: weekly${day ? ` on ${day[0].toUpperCase()}${day.slice(1)}s` : ""}`,
+    );
+  }
   const json = JSON.stringify({
     ...(meta.channelId ? { channelId: meta.channelId } : {}),
     ...(meta.dueDate ? { dueDate: meta.dueDate } : {}),
+    ...(meta.frequency ? { frequency: meta.frequency } : {}),
+    ...(meta.dayOfWeek ? { dayOfWeek: meta.dayOfWeek } : {}),
   });
   parts.push(`\n<!-- ${META_PREFIX} ${json} -->`);
   return parts.join("\n");
@@ -56,7 +99,23 @@ export interface OpenReminder {
   url: string;
   channelId?: string;
   dueDate?: string;
+  frequency: ReminderFrequency;
+  dayOfWeek?: Weekday;
   body: string;
+}
+
+// Whether today's nag sweep should nudge about this reminder. Daily reminders
+// always nag; weekly ones only on their day. A weekly reminder missing its
+// dayOfWeek (hand-edited or malformed metadata) falls back to nagging — better
+// to over-nag than to go silent forever.
+export function shouldNagToday(opts: {
+  reminder: OpenReminder;
+  today: Weekday;
+}): boolean {
+  const { reminder, today } = opts;
+  if (reminder.frequency !== "weekly") return true;
+  if (!reminder.dayOfWeek) return true;
+  return reminder.dayOfWeek === today;
 }
 
 // Lists all open issues labeled `reminder` on Puar's repo, parsing the
@@ -100,6 +159,9 @@ export async function listOpenReminders(): Promise<OpenReminder[]> {
         url: issue.html_url,
         channelId: meta.channelId,
         dueDate: meta.dueDate,
+        // Reminders created before weekly existed have no stored frequency.
+        frequency: meta.frequency ?? "daily",
+        dayOfWeek: meta.dayOfWeek,
         body: issue.body ?? "",
       };
     });
